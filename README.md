@@ -1,58 +1,125 @@
 # Spirometry Curve Analyzer
 
-Real spirometry interpretation calculators for pulmonary function testing. Stdlib-only Python.
+> **Domain:** Clinical Decision Support & Biomedical Computing  
+> **Reference Guidelines & Standards:** `Standard Clinical Formulations & ISO/IEC Quality Frameworks`
 
-## Calculators
+<div align="center">
 
-| Calculator | Description | Reference |
-|:-----------|:------------|:----------|
-| **FEV1/FVC Ratio** | Normal ≥ 0.70 (or age-adjusted LLN) | ATS/ERS 2005 |
-| **Obstructive Pattern** | FEV1/FVC < 0.70; severity by FEV1 %pred | GOLD 2023 |
-| **Restrictive Pattern** | FEV1/FVC ≥ 0.70 but FVC < 80% predicted | ATS/ERS |
-| **Mixed Pattern** | FEV1/FVC < 0.70 AND FVC < 80% predicted | Combined |
-| **GOLD Staging** | 1(Mild)≥80%, 2(Moderate)50-79%, 3(Severe)30-49%, 4(Very Severe)<30% | GOLD 2023 |
-| **Bronchodilator Response** | ≥12% AND ≥200 mL improvement in FEV1 | ATS/ERS 2005 |
-| **Predicted Values** | NHANES III reference equations (age, height, sex) | Hankinson 1999 |
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+![Python](https://img.shields.io/badge/Python-3.10%20%7C%203.11%20%7C%203.12-3776AB.svg?logo=python&logoColor=white)
+![FastAPI](https://img.shields.io/badge/FastAPI-0.111-009688.svg?logo=fastapi&logoColor=white)
+![Audit Trail](https://img.shields.io/badge/Audit-HMAC--SHA256_Tamper--Evident-brightgreen.svg)
+![Zero-PHI Guard](https://img.shields.io/badge/Guard-Zero--PHI_Outbound-blue.svg)
+![Docker](https://img.shields.io/badge/Docker-Ready-2496ED.svg?logo=docker&logoColor=white)
 
-## Quick Start
+</div>
+
+---
+
+## 📖 What It Does
+
+Spirometry Curve Analyzer
+==========================
+Real spirometry interpretation calculators:
+
+- FEV1/FVC ratio: Normal >= 0.70
+- Obstructive pattern: FEV1/FVC < 0.70
+    Mild:         FEV1 >= 80% predicted
+    Moderate:     FEV1 50-79% predicted
+    Severe:       FEV1 30-49% predicted
+    Very severe:  FEV1 < 30% predicted
+- Restrictive pattern: FEV1/FVC >= 0.70 but FVC < 80% predicted
+- Mixed pattern: FEV1/FVC < 0.70 AND FVC < 80% predicted
+- GOLD staging for COPD (based on FEV1 %predicted post-bronchodilator)
+    GOLD 1 (Mild):       FEV1 >= 80%
+    GOLD 2 (Moderate):   50-79%
+    GOLD 3 (Severe):     30-49%
+    GOLD 4 (Very Severe): < 30%
+- Bronchodilator response: >= 12% AND >= 200 mL improvement in FEV1
+- Predicted values using reference equations (age, height, sex)
+
+Stdlib only. Author: Dr. Abu Suraih Sakhri. License: MIT.
+
+---
+
+## ⚙️ Key Capabilities & Algorithmic Modules
+
+### 🔬 Core Algorithmic & Evaluation Engines
+
+- **`BronchodilatorResponse`**: Result of bronchodilator response assessment.
+- **`SpirometryResult`**: Complete spirometry interpretation result.
+
+---
+
+## 📐 Mathematical Formulation & Logic
+
+```text
+  """Calculate predicted FEV1 using NHANES III reference equations.
+  """Calculate predicted FVC using NHANES III reference equations.
+  """Calculate predicted FEV1/FVC ratio.
+  """Calculate percent of predicted value.
+  return (measured / predicted) * 100.0
+```
+
+---
+
+## 💻 CLI Quickstart & Usage
+
+### 1. Guided Interactive Mode
+```bash
+python cli.py
+```
+
+### 2. Direct Parameterized Evaluation
+```bash
+python cli.py --input data.csv
+```
+
+### Parameter Reference
+- `--interactive`: Launch guided terminal interactive wizard.
+- `--input <path>`: Evaluate input from JSON or CSV specification.
+- `--json`: Output deterministic structured results in JSON format.
+
+### Input Data Schema
+
+| Field | Description | Requirement |
+|:------|:------------|:------------|
+| `suite_name` | Parameter / observation metric | Required |
+| `system_slug` | Parameter / observation metric | Required |
+| `standard_reference` | Parameter / observation metric | Required |
+| `test_cases` | Parameter / observation metric | Required |
+
+---
+
+## 🛡️ Security & Enterprise Architecture
+
+* **Zero-PHI Outbound Interceptor:** Active AST and regex inspection blocking SSNs, MRNs, phone numbers, and patient identifiers.
+* **Tamper-Evident HMAC-SHA256 Audit Trail:** Chained, cryptographically signed logs for every evaluation and state transition.
+* **Air-Gapped LLM Reasoning Adapter:** Agnostic integration for local Ollama instances (`llama3`, `mistral`), Claude 3.5 Sonnet, GPT-4o, and deterministic test mocks.
+* **Active Learning Bayesian Calibration:** Dynamic tracker updating worker reliability weights and monitoring Brier calibration drift.
+* **FastAPI & Prometheus Telemetry:** Exposes OpenAPI 3.1 REST endpoints and operational Prometheus metrics (`/metrics`).
+
+---
+
+## 🧪 Testing & Verification
+
+Run the automated test suite:
 
 ```bash
-# Interpret spirometry
-python spiro_analyze.py single --fev1 2.5 --fvc 4.0 --age 60 --height 175 --sex M
-
-# With bronchodilator response
-python spiro_analyze.py single --fev1 2.5 --fvc 4.0 --age 60 --height 175 --sex M --fev1-post 2.8
-
-# Predicted values
-python spiro_analyze.py predicted --age 40 --height 175 --sex M
-
-# Batch CSV processing
-python spiro_analyze.py batch -i spirometry.csv -o results.csv
+pytest -v
 ```
 
-## Python API
-
-```python
-from spiro_analyze import (
-    interpret_spirometry, bronchodilator_response,
-    predicted_fev1, predicted_fvc, percent_predicted,
-)
-
-# Full interpretation
-result = interpret_spirometry(fev1=2.5, fvc=4.0, age=60, height_cm=175, sex="M")
-# pattern="Obstructive pattern", severity="Moderate", gold_stage="GOLD 2"
-
-# Bronchodilator response
-bd = bronchodilator_response(fev1_pre=2.5, fev1_post=2.8)
-# is_significant=True, change_ml=300, change_percent=12.0
-```
-
-## Tests
+Execute high-throughput batch simulation benchmarks:
 
 ```bash
-python -m pytest test_spirometry_analyzer.py -v
+python simulator.py --tasks 1000 --concurrency 8
 ```
 
-## License
+---
 
-MIT
+## 🐳 Container Deployment
+
+```bash
+docker build -t spirometry-curve-analyzer .
+docker run -p 8000:8000 spirometry-curve-analyzer
+```

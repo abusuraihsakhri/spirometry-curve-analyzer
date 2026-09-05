@@ -23,6 +23,13 @@ def test_phi_guard_enforcement():
     PHIGuard.assert_no_phi("Analytical assay specimen KEY-001 optimal")
 
 
+def test_phi_guard_redaction():
+    redacted = PHIGuard.redact_phi("Patient MRN-12345 has phone 555-123-4567")
+    assert "MRN-12345" not in redacted
+    assert "555-123-4567" not in redacted
+    assert "[REDACTED_IDENTIFIER]" in redacted
+
+
 def test_specialized_workers():
     # Worker 1: QC Invariant
     p1 = SystemTaskPayload(task_id="T1", target_identifier="KEY-01", primary_metric=35.0)
@@ -62,4 +69,18 @@ def test_supervisor_consensus_and_audit():
     # CLI tests
     assert main(["audit", "--task-id", "CLI-TEST-01"]) == 0
     assert main(["chat", "Explain", "specifications"]) == 0
+    assert main(["verify-audit"]) == 0
+
+
+def test_cli_no_command_returns_error():
+    """CLI with no command should return non-zero exit code."""
+    assert main([]) == 1
+
+
+def test_cli_verify_audit_command():
+    """Verify-audit command should pass after audit operations."""
+    # First create an audit entry
+    result = main(["audit", "--task-id", "VERIFY-TEST-01"])
+    assert result == 0
+    # Then verify integrity
     assert main(["verify-audit"]) == 0

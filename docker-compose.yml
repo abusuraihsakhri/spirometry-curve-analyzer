@@ -6,6 +6,7 @@ services:
       - "8000:8000"
     environment:
       - AUDIT_SECRET_KEY=${AUDIT_SECRET_KEY:?Set a strong random AUDIT_SECRET_KEY in the environment}
+      - API_ACCESS_TOKEN=${API_ACCESS_TOKEN:?Set a strong random API_ACCESS_TOKEN in the environment}
       - MODEL_PROVIDER=mock
     restart: unless-stopped
     healthcheck:

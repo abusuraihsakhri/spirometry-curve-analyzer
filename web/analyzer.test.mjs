@@ -30,3 +30,15 @@ test("invalid data cannot silently produce a measurement",()=>{
  assert.throws(()=>parseWaveformCsv("time_s,flow_Lps\n0,1\n.5,2\n1,"),/Missing numeric/);
  assert.throws(()=>analyzeWaveform({kind:"flow",samples:[{t:0,value:1},{t:.2,value:1},{t:.4,value:1}]}),/At least 1 s/);
 });
+
+
+test("browser HTML module script parses and links to local analyzer", async () => {
+ const {readFileSync} = await import("node:fs");
+ const {Script} = await import("node:vm");
+ const html=readFileSync(new URL("./index.html",import.meta.url),"utf8");
+ const match=html.match(/<script type="module">([\s\S]*?)<\/script>/);
+ assert.ok(match,"inline module present");
+ const code=match[1].replace(/^\s*import\s+\{[^}]+\}\s+from\s+["'][^"']+["'];/m,"");
+ assert.doesNotThrow(()=>new Script(code));
+ assert.match(html,/from "\.\/analyzer\.mjs"/);
+});

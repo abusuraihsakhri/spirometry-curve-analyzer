@@ -38,6 +38,13 @@ from typing import Any, Dict, List, Optional
 # Reference equations (NHANES III / GLI-2012 simplified)
 # ---------------------------------------------------------------------------
 
+def _validate_legacy_demographics(age: float, height_cm: float) -> None:
+    if not all(math.isfinite(x) for x in (age, height_cm)):
+        raise ValueError("Age and height must be finite")
+    if not (18 <= age <= 95) or not (100 <= height_cm <= 230):
+        raise ValueError("Simplified adult equations require age 18-95 and height 100-230 cm")
+
+
 def predicted_fev1(age: float, height_cm: float, sex: str) -> float:
     """Calculate predicted FEV1 using NHANES III reference equations.
 
@@ -52,8 +59,8 @@ def predicted_fev1(age: float, height_cm: float, sex: str) -> float:
     Returns:
         Predicted FEV1 in litres.
     """
+    _validate_legacy_demographics(age, height_cm)
     sex = sex.upper().strip()
-    h = height_cm / 100.0  # convert to metres for some equations
     if sex == "M":
         # NHANES III male: FEV1 = 0.5536 - 0.01303*age - 0.000172*age^2 + 0.00014107*ht^2
         return 0.5536 - 0.01303 * age - 0.000172 * (age ** 2) + 0.00014107 * (height_cm ** 2)
@@ -75,6 +82,7 @@ def predicted_fvc(age: float, height_cm: float, sex: str) -> float:
     Returns:
         Predicted FVC in litres.
     """
+    _validate_legacy_demographics(age, height_cm)
     sex = sex.upper().strip()
     if sex == "M":
         return 0.7220 - 0.01163 * age - 0.000164 * (age ** 2) + 0.00015813 * (height_cm ** 2)

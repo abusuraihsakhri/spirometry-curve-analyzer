@@ -1,190 +1,72 @@
 # Spirometry Curve Analyzer
 
-> **Domain:** Clinical Decision Support & Biomedical Computing  
-> **Reference Guidelines & Standards:** ATS/ERS 2019, GLI-2012 (Quanjer et al.)
+A Python toolkit and browser viewer for exploratory analysis of digitized spirometry waveforms. **For education and research only — not validated for clinical use.**
 
-<div align="center">
+## Browser viewer
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-![Python](https://img.shields.io/badge/Python-3.10%20%7C%203.11%20%7C%203.12-3776AB.svg?logo=python&logoColor=white)
-![FastAPI](https://img.shields.io/badge/FastAPI-0.110+-009688.svg?logo=fastapi&logoColor=white)
-![Audit Trail](https://img.shields.io/badge/Audit-HMAC--SHA256_Tamper--Evident-brightgreen.svg)
-![Zero-PHI Guard](https://img.shields.io/badge/Guard-Zero--PHI_Outbound-blue.svg)
-![Docker](https://img.shields.io/badge/Docker-Ready-2496ED.svg?logo=docker&logoColor=white)
+The static application in [web/](web/) reads time-series CSV files entirely locally, derives expiratory FVC, FEV1, FEV1/FVC, PEF, FEF25–75, and back-extrapolated volume, draws a flow–volume plot, and exports JSON measurements.
 
-</div>
+1. Supply a CSV containing a time column (e.g., `time_s`) and either flow (`flow_Lps`) or volume (`volume_L`). The maximum is 20,000 samples / 2 MB.
+2. Select **Analyze CSV**, or choose one of two synthetic examples.
+3. Inspect the measurements and the back-extrapolated volume warning. Optionally export the JSON result.
 
----
+All calculations and plotting for the browser viewer use JavaScript; no Python runtime, backend calls, cookies, analytics, or remote uploads are required. Maneuver acceptability, repeatability, end-of-test plateau, and inspiratory data are not established. No clinical diagnosis or validated predicted value is provided.
 
-## 📖 What It Does
-
-Spirometry Curve Analyzer is a clinical decision support tool that interprets spirometry results:
-
-- **FEV1/FVC ratio analysis**: Normal >= LLN (Lower Limit of Normal)
-- **Obstructive pattern detection**: FEV1/FVC < LLN
-  - Mild: FEV1 >= 80% predicted
-  - Moderate: FEV1 50-79% predicted
-  - Severe: FEV1 30-49% predicted
-  - Very severe: FEV1 < 30% predicted
-- **Restrictive pattern suggestion**: FEV1/FVC >= LLN but FVC < 80% predicted
-- **Mixed pattern**: FEV1/FVC < LLN AND FVC < 80% predicted
-- **GOLD staging for COPD** (based on FEV1 %predicted post-bronchodilator)
-- **Bronchodilator response**: >= 12% AND >= 200 mL improvement in FEV1
-- **Predicted values** using GLI-2012 reference equations (age, height, sex, ethnicity)
-- **Waveform analysis**: Parse digitized flow-time or volume-time curves to derive FVC, FEV1, PEF, FEF25-75
-
-Author: Dr. Abu Suraih Sakhri. License: MIT.
-
----
-
-## ⚙️ Key Components
-
-### Core Spirometry Package (`spirometry_analyzer/`)
-
-- **`gli2012.py`**: GLI-2012 LMS reference equations for predicted values and z-scores
-- **`curve_metrics.py`**: Parse digitized waveforms and derive FVC, FEV1, PEF, FEF25-75 with ATS/ERS back-extrapolation
-- **`interpretation.py`**: ATS/ERS 2019 interpretive algorithm using z-scores
-- **`cli.py`**: Command-line interface for waveform analysis
-- **`plotting.py`**: Flow-volume loop visualization with landmarks
-
-### Legacy CLI (`spiro_analyze.py`)
-
-Standalone NHANES III-based calculator with single/batch processing modes.
-
-### Enterprise Agent System (`agents/`)
-
-- **PHI Guard**: Outbound PHI detection and redaction (HIPAA Safe Harbor)
-- **HMAC-SHA256 Audit Trail**: Tamper-evident cryptographic audit logging
-- **Multi-worker evaluation**: QC, Safety, and Protocol Conformance workers
-- **FastAPI REST API**: `/health`, `/metrics`, `/api/audit`, `/api/chat`, `/api/audit/logs`
-
----
-
-## 💻 Installation
+Run locally from the repository root:
 
 ```bash
-pip install -r requirements.txt
+python -m http.server 8000
+# Open http://localhost:8000/web/
 ```
 
----
+The workflow publishes the `web/` directory to GitHub Pages on successful pushes to `master`. Repository Pages settings must select **GitHub Actions** as the deployment source. Do not treat the intended URL as a verified working deployment until it has been independently checked.
 
-## 🧪 Testing & Verification
+## Python toolkit
 
-Run the full test suite:
-
-```bash
-pytest -v
-```
-
-Run specific test files:
+Tested in CI with Python 3.10–3.12. Requires NumPy, SciPy, Matplotlib, Pydantic, FastAPI, and Uvicorn.
 
 ```bash
-pytest tests/ -v              # Enterprise agent tests
-pytest test_spirometry_analyzer.py -v  # Core spirometry tests
-```
-
----
-
-## 💻 CLI Usage
-
-### 1. Single Interpretation (Legacy)
-```bash
+python -m pip install -r requirements.txt
+python -m pytest -q
+python -m spirometry_analyzer.cli sample_data/normal_male_42y.csv --age 42 --height 178 --sex M --plot example.png
 python cli.py single --fev1 3.5 --fvc 4.5 --age 40 --height 175 --sex M
-```
-
-### 2. Predicted Values
-```bash
 python cli.py predicted --age 40 --height 175 --sex M
-```
-
-### 3. Batch CSV Processing
-```bash
 python cli.py batch -i input.csv -o results.csv
 ```
 
-### 4. Waveform Analysis (Core Package)
-```bash
-python -m spiro_analyze single --fev1 3.5 --fvc 4.5 --age 40 --height 175 --sex M
-```
+- `spirometry_analyzer/`: waveform extraction, exploratory interpretation and plotting. Its `gli2012.py` coefficients are **approximations**, not the published GLI-2012 tables; adult reference values, LLN and z-scores are **not clinically validated**.
+- `spiro_analyze.py`: legacy simplified NHANES-like calculations and pattern thresholds. Its GOLD stage is illustrative; COPD staging requires an established clinical diagnosis and post-bronchodilator measurements. Its 12% + 200 mL bronchodilator response rule is a **historical 2005 rule**, not the current 2022 ERS/ATS recommendation.
 
-### 5. Enterprise Audit
-```bash
-python cli.py audit --task-id TASK-001
-python cli.py chat "Explain the interpretation"
-python cli.py verify-audit
-```
+The 2022 ERS/ATS interpretive standard defines a positive bronchodilator response as an increase **greater than 10% of the predicted** FEV1 or FVC, rather than a percentage of the initial measured value: [ERS/ATS interpretation](https://publications.ersnet.org/content/erj/60/1/2101499).
 
-### 6. REST API Server
-```bash
-python cli.py serve --host 0.0.0.0 --port 8000
-```
+For patient care, use quality-assured instrumentation and verified reference equations, not this repository's exploratory calculations.
 
----
+## REST API and security
 
-## 🐳 Container Deployment
+The optional FastAPI service exposes public `/health` and bearer-token-protected `/metrics`, `/api/audit`, `/api/chat`, and `/api/audit/logs` endpoints. The supervisor uses generic, deterministic mock rules, **not validated clinical thresholds or clinical verification**.
 
 ```bash
-docker build -t spirometry-curve-analyzer .
-docker run -p 8000:8000 -e AUDIT_SECRET_KEY=your-secret-key spirometry-curve-analyzer
+export AUDIT_SECRET_KEY="$(python -c 'import secrets; print(secrets.token_urlsafe(32))')"
+export API_ACCESS_TOKEN="$(python -c 'import secrets; print(secrets.token_urlsafe(32))')"
+python cli.py serve --host 127.0.0.1 --port 8000
+curl -H "Authorization: Bearer $API_ACCESS_TOKEN" http://127.0.0.1:8000/metrics
+# Alternatively, with both variables exported: docker compose up --build
 ```
 
-Or with docker-compose:
+Do not submit actual patient identifiers. The PHI interceptor is regex-based and not a comprehensive HIPAA de-identification solution. HMAC-chained audit records are held only **in memory**: they are not durable or verified across restarts. With no `AUDIT_SECRET_KEY`, a random ephemeral development key is generated. Production operation requires durable audit storage, transport security, operational monitoring and further review.
+
+## Testing
 
 ```bash
-docker-compose up
+python -m pytest -q
+node --check web/analyzer.mjs
+node --test web/analyzer.test.mjs
 ```
 
----
+Key directories: `spirometry_analyzer/` (core Python), `agents/` (API/mock supervisor), `tests/` (Python tests), `sample_data/` (synthetic CSV), `web/` (browser app), and `.github/workflows/` (CI/deployment).
 
-## 🛡️ Security
+The browser viewer requires a modern browser with JavaScript modules, SVG, and the local File API. No Pyodide or Python-in-browser runtime is used.
 
-- **Zero-PHI Outbound Interceptor**: Active regex inspection blocking SSNs, MRNs, phone numbers, emails, and patient identifiers
-- **Tamper-Evident HMAC-SHA256 Audit Trail**: Chained, cryptographically signed logs
-- **Configurable Audit Secret**: Set `AUDIT_SECRET_KEY` environment variable in production (a development default is used otherwise with a warning)
+## License
 
----
-
-## 📐 Mathematical Foundation
-
-### GLI-2012 LMS Equations
-```
-z = ((Y / M) ** L - 1) / (L * S)      when L != 0
-z = ln(Y / M) / S                     when L == 0
-```
-
-Where M (median), S (coefficient of variation), and L (skewness) are modeled as functions of height, age, and sex.
-
-### ATS/ERS Interpretive Algorithm
-1. Airflow obstruction: FEV1/FVC z-score < LLN (z < -1.645)
-2. Restrictive pattern: FVC z-score < LLN (suggested, requires TLC confirmation)
-3. Mixed pattern: Both obstruction and restriction present
-
----
-
-## 📁 Project Structure
-
-```
-spirometry-curve-analyzer/
-├── agents/                  # Enterprise agent system
-│   ├── api.py              # FastAPI REST endpoints
-│   ├── base.py             # PHI Guard, Audit Trail
-│   ├── models.py           # Pydantic schemas
-│   ├── supervisor.py       # Multi-agent orchestrator
-│   ├── workers.py          # QC, Safety, Conformance workers
-│   └── ...
-├── spirometry_analyzer/     # Core analysis package
-│   ├── gli2012.py          # GLI-2012 reference equations
-│   ├── curve_metrics.py    # Waveform parsing
-│   ├── interpretation.py   # ATS/ERS algorithm
-│   ├── cli.py              # Package CLI
-│   └── plotting.py         # Visualization
-├── tests/                   # Pytest test suite
-├── sample_data/             # Example spirometry waveforms
-├── scripts/                 # Data generation utilities
-├── cli.py                   # Unified CLI entry point
-├── spiro_analyze.py         # Legacy standalone CLI
-├── requirements.txt         # Python dependencies
-├── pyproject.toml           # Project metadata
-├── Dockerfile               # Container build
-└── docker-compose.yml       # Container orchestration
-```
+MIT; see [LICENSE](LICENSE).

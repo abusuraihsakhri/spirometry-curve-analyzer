@@ -47,9 +47,11 @@ def load_waveform_csv(path: str) -> Waveform:
     Header matching is case-insensitive and tolerant of underscores/units,
     e.g. "time_s", "flow (L/s)", "Volume_L" are all recognized.
     """
-    with open(path, newline="") as f:
+    with open(path, newline="", encoding="utf-8-sig") as f:
         reader = csv.reader(f)
-        header = next(reader)
+        header = next(reader, None)
+        if not header:
+            raise ValueError("CSV is empty or missing a header")
         rows = [row for row in reader if row and any(cell.strip() for cell in row)]
 
     norm = [h.strip().lower() for h in header]
@@ -69,15 +71,28 @@ def load_waveform_csv(path: str) -> Waveform:
     if flow_idx is None and vol_idx is None:
         raise ValueError("CSV must have a 'flow' or 'volume' column")
 
+    if len(rows) < 3:
+        raise ValueError("Waveform must contain at least three samples")
+    if any(len(row) <= max(t_idx, *(i for i in (flow_idx, vol_idx) if i is not None)) for row in rows):
+        raise ValueError("Waveform CSV contains incomplete rows")
+
     t = np.array([float(r[t_idx]) for r in rows], dtype=float)
+    if not np.all(np.isfinite(t)):
+        raise ValueError("Waveform times must be finite")
     order = np.argsort(t)
     t = t[order]
+    if np.any(np.diff(t) <= 0):
+        raise ValueError("Waveform time values must be unique")
 
     if flow_idx is not None:
         flow = np.array([float(r[flow_idx]) for r in rows], dtype=float)[order]
+        if not np.all(np.isfinite(flow)):
+            raise ValueError("Waveform flow must be finite")
         volume = np.concatenate(([0.0], cumulative_trapezoid(flow, t)))
     else:
         volume = np.array([float(r[vol_idx]) for r in rows], dtype=float)[order]
+        if not np.all(np.isfinite(volume)):
+            raise ValueError("Waveform volume must be finite")
         volume = volume - volume[0]
         window = min(11, len(t) if len(t) % 2 == 1 else len(t) - 1)
         if window >= 5:
@@ -99,6 +114,14 @@ def compute_metrics(waveform: Waveform) -> SpirometryMetrics:
     """
     t, volume, flow = waveform.t, waveform.volume, waveform.flow
 
+    if (
+        t.ndim != 1 or volume.ndim != 1 or flow.ndim != 1
+        or len(t) < 3 or len(t) != len(volume) or len(t) != len(flow)
+        or not np.all(np.isfinite(t)) or not np.all(np.isfinite(volume))
+        or not np.all(np.isfinite(flow)) or np.any(np.diff(t) <= 0)
+    ):
+        raise ValueError("Waveform arrays must be finite, equal-length and strictly time-ordered")
+
     idx_pef = int(np.argmax(flow))
     pef = float(flow[idx_pef])
     if pef <= 0:
@@ -108,6 +131,9 @@ def compute_metrics(waveform: Waveform) -> SpirometryMetrics:
 
     t0 = t_pef - v_pef / pef
     t0 = max(t0, float(t[0]))
+
+    if float(t[-1]) < t0 + FEV1_TIME_S:
+        raise ValueError("Recording must extend at least one second after corrected start")
 
     v_mono = np.maximum.accumulate(volume)
 

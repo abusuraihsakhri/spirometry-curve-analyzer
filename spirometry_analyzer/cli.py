@@ -17,7 +17,7 @@ def build_parser() -> argparse.ArgumentParser:
             "Analyze a digitized flow-volume spirometry curve: derive FVC, FEV1, "
             "FEV1/FVC and PEF, and classify the pattern (obstructive / restrictive "
             "/ mixed / normal) per the ATS/ERS 2019 interpretive algorithm using "
-            "GLI-2012 reference equations."
+            "approximate, unvalidated reference equations (research only)."
         ),
     )
     p.add_argument("input", help="CSV file with a 'time' column and a 'flow' or 'volume' column")
@@ -38,7 +38,7 @@ def build_parser() -> argparse.ArgumentParser:
 def format_report(patient_id, age, height, sex, ethnicity, metrics, result) -> str:
     lines = []
     lines.append("=" * 60)
-    lines.append("SPIROMETRY REPORT")
+    lines.append("SPIROMETRY EXPLORATORY REPORT — NOT FOR CLINICAL USE")
     if patient_id:
         lines.append(f"Patient: {patient_id}")
     lines.append(f"Age: {age:.0f} y   Height: {height:.0f} cm   Sex: {sex}   Ethnicity: {ethnicity}")
@@ -53,11 +53,11 @@ def format_report(patient_id, age, height, sex, ethnicity, metrics, result) -> s
         f"  Back-extrapolated volume  {metrics.back_extrapolated_volume:5.3f} L "
         f"({metrics.back_extrapolated_pct_fvc:4.1f}% of FVC)"
         + ("  [WARNING: exceeds ATS/ERS 5%/0.150L acceptability limit]"
-           if metrics.back_extrapolated_volume > 0.150 and metrics.back_extrapolated_pct_fvc > 5.0
+           if metrics.back_extrapolated_volume > max(0.100, 0.05 * metrics.fvc)
            else "")
     )
     lines.append("-" * 60)
-    lines.append("GLI-2012 predicted values / % predicted / z-score / LLN:")
+    lines.append("APPROXIMATE, UNVALIDATED reference values / % predicted / z-score / LLN:")
     lines.append(
         f"  FEV1      pred {result.fev1_pred:5.2f} L   %pred {result.fev1_pct_pred:6.1f}%   "
         f"z {result.fev1_z:+5.2f}   LLN {result.fev1_lln:5.2f} L"

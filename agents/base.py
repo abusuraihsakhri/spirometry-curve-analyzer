@@ -9,6 +9,8 @@ import time
 import hmac
 import hashlib
 import warnings
+import secrets
+import copy
 from typing import Dict, Any, List, Optional
 from datetime import datetime, timezone
 from pydantic import BaseModel, Field
@@ -63,12 +65,13 @@ class AuditTrail:
             # Development/test fallback: emit a warning but allow operation.
             # In production, always set AUDIT_SECRET_KEY to a strong random value.
             warnings.warn(
-                "AUDIT_SECRET_KEY not set; using an insecure development default. "
-                "Set the AUDIT_SECRET_KEY environment variable in production.",
+                "AUDIT_SECRET_KEY not set; using an ephemeral random key. "
+                "Audit records cannot be verified after restart. "
+                "Set AUDIT_SECRET_KEY to a secure persistent secret in production.",
                 RuntimeWarning,
                 stacklevel=2,
             )
-            resolved_key = "DEV-ONLY-INSECURE-KEY-REPLACE-IN-PRODUCTION"
+            resolved_key = secrets.token_urlsafe(32)
         self.secret_key = resolved_key.encode("utf-8")
         self.logs: List[Dict[str, Any]] = []
 
@@ -95,14 +98,29 @@ class AuditTrail:
         return entry
 
     def verify_integrity(self) -> bool:
-        for i, entry in enumerate(self.logs):
-            prev = self.logs[i-1]["current_hash"] if i > 0 else "GENESIS_BLOCK_0000000000000000"
-            if entry["prev_hash"] != prev:
-                return False
+        """Check both the hash-chain links and HMAC signature of each record."""
+        previous = "GENESIS_BLOCK_0000000000000000"
+        try:
+            for entry in self.logs:
+                if entry["prev_hash"] != previous:
+                    return False
+                message = "|".join(str(entry[key]) for key in (
+                    "audit_id", "timestamp", "actor", "actor_tier",
+                    "event_type", "payload_hash", "prev_hash",
+                ))
+                expected = hmac.new(
+                    self.secret_key, message.encode("utf-8"), hashlib.sha256
+                ).hexdigest()
+                if not hmac.compare_digest(str(entry["current_hash"]), expected):
+                    return False
+                previous = entry["current_hash"]
+        except (KeyError, TypeError, ValueError):
+            return False
         return True
 
     def get_trail(self) -> List[Dict[str, Any]]:
-        return self.logs
+        """Never expose the mutable in-memory source of the audit trail."""
+        return copy.deepcopy(self.logs)
 
 
 _GLOBAL_AUDIT: Optional[AuditTrail] = None

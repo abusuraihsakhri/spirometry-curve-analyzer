@@ -17,7 +17,7 @@ Real spirometry interpretation calculators:
     GOLD 2 (Moderate):   50-79%
     GOLD 3 (Severe):     30-49%
     GOLD 4 (Very Severe): < 30%
-- Bronchodilator response: >= 12% AND >= 200 mL improvement in FEV1
+- Bronchodilator response (2005-era rule): >= 12% AND >= 200 mL improvement in FEV1
 - Predicted values using reference equations (age, height, sex)
 
 Stdlib only. Author: Dr. Abu Suraih Sakhri. License: MIT.
@@ -186,7 +186,9 @@ def bronchodilator_response(fev1_pre: float, fev1_post: float) -> Bronchodilator
     change_ml = change_l * 1000.0
     change_pct = (change_l / fev1_pre * 100.0) if fev1_pre > 0 else 0.0
 
-    significant = change_pct >= 12.0 and change_ml >= 200.0
+    if not all(math.isfinite(x) for x in (fev1_pre, fev1_post)) or fev1_pre <= 0 or fev1_post < 0:
+        raise ValueError("FEV1 inputs must be finite; baseline must be positive")
+    significant = change_pct >= 12.0 and change_ml >= 200.0 - 1e-6
 
     if significant:
         interp = "Significant bronchodilator response (>=12% and >=200 mL improvement)"
@@ -251,12 +253,14 @@ def interpret_spirometry(
     Returns:
         SpirometryResult dataclass.
     """
-    if fev1 < 0 or fvc < 0:
-        raise ValueError("FEV1 and FVC must be >= 0")
-    if fev1 > fvc * 1.1:  # allow small measurement tolerance
+    if not all(math.isfinite(x) for x in (fev1, fvc, age, height_cm)):
+        raise ValueError("Spirometry inputs must be finite")
+    if fev1 <= 0 or fvc <= 0:
+        raise ValueError("FEV1 and FVC must be positive")
+    if fev1 > fvc:
         raise ValueError(f"FEV1 ({fev1}) cannot exceed FVC ({fvc})")
-    if age <= 0 or height_cm <= 0:
-        raise ValueError("Age and height must be > 0")
+    if not (18 <= age <= 95) or not (100 <= height_cm <= 230):
+        raise ValueError("Simplified adult equations require age 18-95 and height 100-230 cm")
 
     ratio = fev1 / fvc if fvc > 0 else 0.0
 
@@ -279,9 +283,9 @@ def interpret_spirometry(
     notes: List[str] = []
 
     if mixed:
-        pattern = "Mixed obstructive-restrictive pattern"
+        pattern = "Mixed pattern suspected (requires TLC confirmation)"
         severity = _obstructive_severity(fev1_pct)
-        notes.append("Both obstruction and restriction present. Consider full pulmonary function testing with lung volumes.")
+        notes.append("Reduced FVC with obstruction does not establish restriction; measure TLC. Reference equations are simplified and not validated for clinical decisions.")
     elif obstruction:
         pattern = "Obstructive pattern"
         severity = _obstructive_severity(fev1_pct)
@@ -297,6 +301,7 @@ def interpret_spirometry(
     gold = None
     if obstruction:
         gold = _gold_stage(fev1_pct)
+        notes.append("GOLD grade is illustrative only; staging requires confirmed COPD and post-bronchodilator spirometry.")
 
     return SpirometryResult(
         fev1=fev1,
@@ -395,8 +400,9 @@ def process_csv(input_path: str, output_path: str) -> int:
             results.append(d)
 
     if results:
+        fieldnames = list(dict.fromkeys(key for row in results for key in row))
         with open(output_path, "w", newline="", encoding="utf-8") as f:
-            writer = csv.DictWriter(f, fieldnames=list(results[0].keys()))
+            writer = csv.DictWriter(f, fieldnames=fieldnames)
             writer.writeheader()
             writer.writerows(results)
     return len(results)

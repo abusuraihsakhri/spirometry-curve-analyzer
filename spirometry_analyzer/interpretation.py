@@ -1,4 +1,4 @@
-"""ATS/ERS 2019 spirometry interpretive algorithm.
+"""Exploratory spirometry interpretation (unvalidated approximate references).
 
 Implements the standard obstructive / restrictive / mixed decision tree
 (Pellegrino et al. 2005, retained and refined by the 2019 ATS/ERS technical
@@ -73,7 +73,7 @@ def classify(
     sex: str,
     ethnicity: str = "caucasian",
 ) -> InterpretationResult:
-    """Classify a spirometry result per the ATS/ERS 2019 algorithm."""
+    """Classify measured results for exploratory use; not a clinical determination."""
     if fvc <= 0 or fev1 <= 0:
         raise ValueError("fev1 and fvc must be positive")
     if fev1 > fvc * 1.0001:
@@ -96,9 +96,13 @@ def classify(
     obstruction = ratio_z < Z_LLN
     restriction_suggested = fvc_z < Z_LLN
 
-    notes = []
+    notes = [
+        "Reference equations are approximate and unvalidated; do not use this "
+        "classification for diagnosis or clinical decisions. Confirm using "
+        "validated reference equations and quality-assured spirometry."
+    ]
     if obstruction and restriction_suggested:
-        pattern = "Mixed obstructive/restrictive pattern (restriction suggested)"
+        pattern = "Obstruction with low FVC (mixed defect possible; TLC needed)"
         severity = severity_grade(fev1_z)
         notes.append(
             "Reduced FEV1/FVC with reduced FVC: consistent with a mixed defect, "

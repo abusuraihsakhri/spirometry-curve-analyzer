@@ -1,4 +1,4 @@
-"""GLI-2012 reference equations for spirometry (predicted values and z-scores).
+"""Approximate adult spirometry reference equations (not official GLI-2012).
 
 Implements the Global Lung Function Initiative 2012 (GLI-2012) LMS
 (Lambda-Mu-Sigma) approach of Quanjer et al., "Multi-ethnic reference values
@@ -13,15 +13,12 @@ ethnicity, using the log-linear form:
 
     ln(M) = a0 + a1 * ln(height_cm) + a2 * ln(age_years) + ethnicity_offset
 
-NOTE ON FIDELITY: the official GLI-2012 equations also include a cubic-spline
-correction term (evaluated from published age-node lookup tables) that mainly
-corrects the pubertal growth-spurt years. That correction is ~0 for the adult
-range this tool targets (age >= 18) and is therefore omitted here. The
-regression coefficients below are calibrated to reproduce the adult reference
-means and limits of normal reported in the GLI-2012 paper to within
-clinically reasonable tolerance; they are NOT a verbatim transcription of the
-official coefficient tables. For clinical decision-making, cross-check
-against the official GLI-2012 calculator (https://gli-calculator.ersnet.org).
+IMPORTANT: The coefficients below are illustrative approximations, NOT
+published or validated GLI-2012 coefficients. The official reference equations
+use age-dependent spline terms and parameter-specific LMS tables. Outputs here
+must NOT be used for clinical diagnosis, triage or clinical reporting. This
+implementation supports adult exploratory examples only (18-95 years). For
+clinical applications, replace with a validated reference implementation.
 """
 
 from __future__ import annotations
@@ -100,8 +97,8 @@ def _validate(sex: str, ethnicity: str, param: str, age: float, height_cm: float
         raise ValueError(f"ethnicity must be one of {ETHNICITIES}, got {ethnicity!r}")
     if param not in PARAMS:
         raise ValueError(f"param must be one of {PARAMS}, got {param!r}")
-    if not (3 <= age <= 95):
-        raise ValueError("GLI-2012 is defined for age 3-95 years")
+    if not (18 <= age <= 95):
+        raise ValueError("Approximate reference equations support adults age 18-95 only")
     if not (50 <= height_cm <= 250):
         raise ValueError("height_cm must be a plausible standing height (50-250 cm)")
 

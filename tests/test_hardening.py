@@ -69,3 +69,18 @@ def test_legacy_inputs_and_response_validated():
         interpret_spirometry(float("nan"), 3.0, 50, 170, "M")
     with pytest.raises(ValueError, match="finite"):
         bronchodilator_response(2, float("nan"))
+
+
+
+def test_api_bearer_token_required(monkeypatch):
+    from fastapi import HTTPException
+    from agents.api import require_api_token
+    monkeypatch.setenv("API_ACCESS_TOKEN", "test-token")
+    with pytest.raises(HTTPException) as exc:
+        require_api_token(None)
+    assert exc.value.status_code == 401
+    assert require_api_token("Bearer test-token") is None
+    monkeypatch.delenv("API_ACCESS_TOKEN")
+    with pytest.raises(HTTPException) as exc:
+        require_api_token("Bearer test-token")
+    assert exc.value.status_code == 503
